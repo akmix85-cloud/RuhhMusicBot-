@@ -4,7 +4,8 @@ from collections import deque
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pytgcalls import PyTgCalls
-from pytgcalls.types.input_stream import AudioPiped
+from pytgcalls.types.input_stream import AudioPiped, AudioVideoPiped
+from pytgcalls.types.input_stream.quality import HighQualityVideo, HighQualityAudio
 
 from youtubesearchpython import VideosSearch
 import yt_dlp
@@ -43,7 +44,7 @@ async def is_admin(chat_id, user_id):
 
 
 def mention(user):
-    return f"[{user.first_name}](tg://user?id={user.id})"
+    return f"{user.first_name}"
 
 
 # ================= START =================
@@ -52,17 +53,17 @@ async def start(_, m):
     owner = await app.get_users(OWNER_ID)
     await m.reply(
         f"""
-🎧 Ruhh Music
+🎧 Dream With Music
 
-👑 Owner: [{owner.first_name}](tg://user?id={OWNER_ID})
+👑 Owner: {owner.first_name}
 
-▶ Use /play song name
+▶ Use /play or /vplay song name
 """,
         disable_web_page_preview=True
     )
 
 
-# ================= PLAY =================
+# ================= PLAY (AUDIO) =================
 @app.on_message(filters.command("play") & filters.group)
 async def play(_, m):
     await m.delete()
@@ -88,11 +89,9 @@ async def play(_, m):
 
     queues.setdefault(chat_id, deque())
 
-    # Already playing → Queue card
     if chat_id in call.active_calls:
         queues[chat_id].append(audio)
         pos = len(queues[chat_id])
-
         return await app.send_message(
             chat_id,
             f"""
@@ -105,7 +104,6 @@ async def play(_, m):
             disable_web_page_preview=True
         )
 
-    # Start playing
     current_audio[chat_id] = audio
     await call.join_group_call(chat_id, AudioPiped(audio))
 
@@ -128,7 +126,66 @@ async def play(_, m):
 ⏱ Duration: {duration}
 🌹 Requested By: {mention(m.from_user)}
 
-🎧 Ruhh Music
+🎧 𐍂υᖾᖾ 𐌼υδιϲ
+""",
+        reply_markup=buttons
+    )
+
+
+# ================= VPLAY (VIDEO) =================
+@app.on_message(filters.command("vplay") & filters.group)
+async def vplay(_, m):
+    await m.delete()
+
+    if len(m.command) < 2:
+        return
+
+    chat_id = m.chat.id
+    query = " ".join(m.command[1:])
+
+    search = VideosSearch(query, limit=1)
+    r = search.result()["result"][0]
+
+    title = r["title"]
+    duration = r["duration"]
+    video_id = r["id"]
+    thumb = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+    url = r["link"]
+
+    ydl_opts = {"format": "bestvideo+bestaudio/best", "quiet": True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        stream_url = info["url"]
+
+    await call.join_group_call(
+        chat_id,
+        AudioVideoPiped(
+            stream_url,
+            HighQualityVideo(),
+            HighQualityAudio(),
+        ),
+    )
+
+    buttons = InlineKeyboardMarkup(
+        [[
+            InlineKeyboardButton("⏸", callback_data="pause"),
+            InlineKeyboardButton("▶", callback_data="resume"),
+            InlineKeyboardButton("⏭", callback_data="skip"),
+            InlineKeyboardButton("⏹", callback_data="end"),
+        ]]
+    )
+
+    await app.send_photo(
+        chat_id,
+        photo=thumb,
+        caption=f"""
+🎥 VIDEO STREAMING STARTED
+
+✨ Title: {title}
+⏱ Duration: {duration}
+🌹 Requested By: {mention(m.from_user)}
+
+🎧 𐍂υᖾᖾ 𐌼υδιϲ
 """,
         reply_markup=buttons
     )
