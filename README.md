@@ -1,4 +1,4 @@
-# RuhhMusicBot
+# RuhhMusicBot VC Bot
 
 Telegram Voice Chat Music Bot  
 Clean UI • Admin Controls • Queue Cards
